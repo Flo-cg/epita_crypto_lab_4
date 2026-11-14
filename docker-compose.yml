@@ -1,0 +1,66 @@
+# Lab 4: an internal PKI, a TLS server, mutual TLS in front of an internal API.
+#
+#   root-ca     offline root CA: no network at all; stopped after phase 2
+#   issuing-ca  issuing (intermediate) CA: no network either, it only signs files
+#   client      the workstation: creates keys and CSRs, tests the server
+#   nginx       TLS front end for www.lab.internal (starts once phase 3 is done)
+#   api         internal API; trusts the identity nginx passes in headers
+#
+# Files move between the CAs and the client through ./exchange (CSRs in, certificates out).
+name: pki-lab
+
+x-tools: &tools
+  build: ./tools
+  image: pki-lab-tools
+  command: sleep infinity
+  init: true
+
+services:
+  root-ca:
+    <<: *tools
+    network_mode: none
+    volumes:
+      - ./root:/pki/root
+      - ./exchange:/pki/exchange
+
+  issuing-ca:
+    <<: *tools
+    network_mode: none
+    volumes:
+      - ./intermediate:/pki/intermediate
+      - ./exchange:/pki/exchange
+      - ./root/certs:/pki/root/certs:ro
+
+  client:
+    <<: *tools
+    networks: [frontend]
+    volumes:
+      - ./identities:/pki/identities
+      - ./exchange:/pki/exchange
+      - ./root/certs:/pki/root/certs:ro
+      - ./intermediate/certs:/pki/intermediate/certs:ro
+
+  api:
+    image: python:3.13-alpine
+    command: python -u /app/app.py
+    volumes:
+      - ./api:/app:ro
+    networks: [frontend, backend]
+
+  nginx:
+    image: nginx:1.29-alpine
+    networks:
+      frontend:
+        aliases: [www.lab.internal]
+      backend: {}
+    ports: ["127.0.0.1:9443:443"]
+    volumes:
+      - ./nginx:/etc/nginx/conf.d:ro      # the folder, not the file: an edited file is seen at once
+      - ./identities/www:/etc/nginx/tls:ro
+      - ./intermediate/certs:/etc/nginx/ca:ro
+      - ./intermediate/crl:/etc/nginx/crl:ro
+
+networks:
+  frontend: {}
+  backend:
+    internal: true

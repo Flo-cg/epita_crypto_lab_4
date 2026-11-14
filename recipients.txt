@@ -1,0 +1,9 @@
+# Who can decrypt the identities' private keys (identities/*/*.key.pem.age). One age public key per line.
+# keys.sh seal encrypts to every key listed here, and needs at least 3: the trainer, the CI, you.
+
+# The trainer: keep this line, it is used for grading.
+age1ttsd2gh9kket0e38dy448umhlghas472msvalj3ryqxcjjaf8ycq4tjhdn
+
+# The CI: add the public key of ci.key here (age-keygen -y ci.key).
+
+# You: add your own public key here (age-keygen -y ~/.config/age/keys.txt).

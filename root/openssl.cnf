@@ -1,0 +1,61 @@
+# Root CA configuration. Used inside the root-ca container, from /pki:
+#   openssl req ... -config root/openssl.cnf   creates the root certificate (self-signed)
+#   openssl ca  ... -config root/openssl.cnf   signs the intermediate, publishes the root CRL
+#
+# Replace every TODO. OpenSSL refuses to run while a TODO is left.
+
+# ---------------------------------------------------------------- openssl ca
+[ ca ]
+default_ca = CA_default             # the section that describes this CA
+
+[ CA_default ]
+dir               = /pki/root
+certs             = $dir/certs
+crl_dir           = $dir/crl
+new_certs_dir     = $dir/newcerts   # openssl ca keeps a copy of every certificate it signs, named by serial
+database          = $dir/index.txt  # the CA database: one line per certificate signed (V valid, R revoked)
+serial            = $dir/serial     # serial number of the next certificate (hexadecimal)
+crlnumber         = $dir/crlnumber  # number of the next CRL
+private_key       = $dir/private/ca.key.pem
+certificate       = $dir/certs/ca.cert.pem
+
+default_md        = TODO            # hash used in signatures. Hint: match the strength of a P-384 key
+default_days      = TODO            # validity of what the root signs: the intermediate. 10 years, in days
+default_crl_days  = 180             # how long a root CRL stays valid: the root is offline, it publishes rarely
+policy            = policy_strict
+copy_extensions   = none            # never take extensions from a CSR: the CA decides what it signs
+unique_subject    = no
+email_in_dn       = no
+
+[ policy_strict ]
+# What the subject of a certificate signed by the root must contain
+countryName       = match           # same value as in the root's own subject
+organizationName  = match
+commonName        = supplied        # must be present, any value
+
+# ---------------------------------------------------------------- openssl req
+[ req ]
+prompt             = no             # take the subject below, do not ask
+distinguished_name = root_dn
+string_mask        = utf8only
+
+[ root_dn ]
+countryName       = FR
+organizationName  = EPITA Lab
+commonName        = TODO            # the root's name, for example: EPITA Lab Root CA
+
+# ---------------------------------------------------------------- extensions
+[ v3_ca ]
+# The root certificate itself
+basicConstraints       = critical, CA:TRUE, pathlen:TODO   # how many CA levels may exist BELOW the root?
+keyUsage               = critical, TODO                    # what may this key do? Sign certificates, sign CRLs
+subjectKeyIdentifier   = hash
+authorityKeyIdentifier = keyid:always,issuer
+
+[ v3_intermediate_ca ]
+# What the root puts in the intermediate's certificate
+basicConstraints       = critical, CA:TRUE, pathlen:TODO   # may the intermediate create another CA?
+keyUsage               = critical, digitalSignature, keyCertSign, cRLSign
+nameConstraints        = critical, permitted;DNS:TODO      # the only DNS names it may certify: lab.internal and below
+subjectKeyIdentifier   = hash
+authorityKeyIdentifier = keyid:always,issuer

@@ -1,0 +1,65 @@
+# Issuing (intermediate) CA configuration. Used inside the issuing-ca container, from /pki:
+#   openssl req ... -config intermediate/openssl.cnf   creates the intermediate's CSR
+#   openssl ca  ... -config intermediate/openssl.cnf   signs servers and clients, revokes, publishes the CRL
+#
+# Replace every TODO. OpenSSL refuses to run while a TODO is left.
+
+# ---------------------------------------------------------------- openssl ca
+[ ca ]
+default_ca = CA_default
+
+[ CA_default ]
+dir               = /pki/intermediate
+certs             = $dir/certs
+crl_dir           = $dir/crl
+new_certs_dir     = $dir/newcerts
+database          = $dir/index.txt
+serial            = $dir/serial
+crlnumber         = $dir/crlnumber
+private_key       = $dir/private/int.key.pem
+certificate       = $dir/certs/int.cert.pem
+
+default_md        = TODO            # hash used in signatures of leaf certificates and CRLs
+default_days      = TODO            # validity of server and client certificates. Short: why?
+default_crl_days  = 7               # a CRL must be published again before this, or every client is refused
+policy            = policy_loose
+copy_extensions   = copy            # take from the CSR only what the sections below do not set: the SAN.
+                                    # The CA still decides basicConstraints, keyUsage, EKU. Never use copyall.
+unique_subject    = no
+email_in_dn       = no
+
+[ policy_loose ]
+# Servers and people: only a name is required
+countryName       = optional
+organizationName  = optional
+commonName        = supplied
+
+# ---------------------------------------------------------------- openssl req
+[ req ]
+prompt             = no
+distinguished_name = intermediate_dn
+string_mask        = utf8only
+
+[ intermediate_dn ]
+# Must match the root's policy_strict: same country and organisation
+countryName       = TODO
+organizationName  = TODO
+commonName        = EPITA Lab Issuing CA
+
+# ---------------------------------------------------------------- extensions
+[ server_cert ]
+basicConstraints       = critical, CA:FALSE
+keyUsage               = critical, digitalSignature
+extendedKeyUsage       = TODO                  # what this certificate is for: a TLS server
+# no subjectAltName here: the server asks for its names in its CSR (openssl req -addext ...)
+subjectKeyIdentifier   = hash
+authorityKeyIdentifier = keyid,issuer
+
+[ client_cert ]
+# For people and services. The SAN comes from the CSR: email:alice@lab.internal,
+# or URI:spiffe://lab.internal/billing for a service.
+basicConstraints       = critical, CA:FALSE
+keyUsage               = critical, digitalSignature
+extendedKeyUsage       = TODO                  # what this certificate is for: a TLS client
+subjectKeyIdentifier   = hash
+authorityKeyIdentifier = keyid,issuer

@@ -1,0 +1,40 @@
+# Runs when you push one of the lab's tags: working, broken, fixed.
+# Needs the repository secret AGE_KEY: the content of ci.key (see the README, "Before the first tag").
+name: check
+
+on:
+  push:
+    tags: [working, broken, fixed]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0   # the whole history, for the next step
+
+      - name: No private key in clear, in any commit
+        run: |
+          if git log --all --name-only --format= | sort -u | grep -E '(^|/)private/|\.key\.pem$|\.key$'; then
+            echo "::error::a private key in clear is in the git history (files above): the lab fails"
+            exit 1
+          fi
+
+      - name: Decrypt the identities' keys
+        env:
+          AGE_KEY: ${{ secrets.AGE_KEY }}
+        run: ./keys.sh open
+
+      - name: Start the server side
+        run: docker compose up -d --build api nginx
+
+      - name: check.sh ${{ github.ref_name }}
+        run: ./check.sh "${{ github.ref_name }}"
+
+      - name: Logs, if something failed
+        if: failure()
+        run: docker compose logs nginx api
